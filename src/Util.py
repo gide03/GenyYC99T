@@ -74,6 +74,88 @@ class CommmandDataFrame:
         self.DATA = _DATA
         self.CRC16 = _CRC16
         self.EOI = _EOI
+        
+    def genDataFrame(self, command:int, data:list)->list:
+        '''
+            generate geny command dataframe (refer to AT-PRO-YC99T documentation)
+        '''
+        temp = []
+        # create COMMAND + DATA field
+        temp.append(command)
+        temp.append(0x00)
+        temp.extend(data)
+
+        # create crc field
+        crc_ = Util.calc_CRC(temp[:])
+
+        # create length field
+        data_length = Util.uint2byteList(len(temp))
+
+        # join fields
+        output = [CommmandDataFrame.SOI_CONSTANT]
+        output.extend(data_length)
+        output.extend(temp)   
+        output.extend(crc_)     
+        output.append(CommmandDataFrame.EOI_CONSTANT)
+        return output.copy()
+
+class ResponseDataFrame:
+    SOI_BIT_LENGTH = 1
+    DATA_FRAME_BIT_LENGTH = 4
+    COMMAND_BIT_LENGTH = 2
+    ERROR_CODE_BIT_LENGTH = 1
+    CRC16_BIT_LENGTH = 2
+    EOI_BIT_LENGTH = 1
+    
+    SOI_CONSTANT = 0x7e
+    EOI_CONSTANT = 0xff
+      
+    def __init__(self):
+        # variable that store 
+        self.SOI = []
+        self.LEN = []
+        self.COMMAND = []
+        self.ERRORCODE = []
+        self.DATA = []
+        self.CRC16 = []
+        self.EOI = []
+        
+        self.errorMessage = ''
+    
+    def extractDataFrame(self, dataFrame:bytearray):
+        '''
+            Extract information inside Response data frame
+        '''
+        dFrame = list(dataFrame)
+        if len(dFrame) == 0 or dFrame == None: # Protection for empty datframe
+            raise Exception(f'Data frame is empty')
+
+        # Protection for invalid flag
+        if dFrame[0] == ResponseDataFrame.SOI_CONSTANT and dFrame[-1] == ResponseDataFrame.EOI_CONSTANT:
+            pass
+        else:
+            raise Exception(f'Wrong dataframe format (INVALID FLAG)')
+        
+        _SOI = [dFrame.pop(0) for i in range(ResponseDataFrame.SOI_BIT_LENGTH)]
+        _LEN = [dFrame.pop(0) for i in range(ResponseDataFrame.DATA_FRAME_BIT_LENGTH)]
+        responseLength = Util.Hex2uint(_LEN, ResponseDataFrame.DATA_FRAME_BIT_LENGTH)
+        if responseLength + ResponseDataFrame.CRC16_BIT_LENGTH + ResponseDataFrame.EOI_BIT_LENGTH == len(dFrame):
+            pass
+        else:
+            raise Exception(f'Invalid dataframe')
+        _COMMAND = [dFrame.pop(0) for i in range(ResponseDataFrame.COMMAND_BIT_LENGTH)]
+        _ERRORCODE = [dFrame.pop(0) for i in range(ResponseDataFrame.ERROR_CODE_BIT_LENGTH)]
+        _DATA = [dFrame.pop(0) for i in range(responseLength - ResponseDataFrame.COMMAND_BIT_LENGTH - ResponseDataFrame.ERROR_CODE_BIT_LENGTH)]
+        _CRC16 = [dFrame.pop(0) for i in range(ResponseDataFrame.CRC16_BIT_LENGTH)]
+        _EOI = [dFrame.pop(0) for i in range(ResponseDataFrame.EOI_BIT_LENGTH)]
+        
+        self.SOI = _SOI
+        self.LEN = _LEN
+        self.COMMAND = _COMMAND
+        self.ERRORCODE = _ERRORCODE
+        self.DATA = _DATA
+        self.CRC16 = _CRC16
+        self.EOI = _EOI
 
 class Util:  
     class YC99T_5C:
@@ -372,13 +454,26 @@ class Util:
 if __name__ == '__main__':
     
     def test_1():
-        # Command data type
+        # Command data frame
         inputData = b'~A\x00\x00\x00\xa0\x00?\x06\x00\x00\xc8B\x00\x00\x00\x00\x06\x00\x00\xc8B\x00\x00pC\x06\x00\x00\xc8B\x00\x00\xf0B\n\x00\x00\xa0@\x00\x00\x00\x00\n\x00\x00\xa0@\x00\x00pC\n\x00\x00\xa0@\x00\x00\xf0B\x00\x00HB\x00\x00pB<I\xff'
         dataFrame = CommmandDataFrame()
         dataFrame.extractDataFrame(inputData)
         print(dataFrame.SOI)
         print(dataFrame.LEN)
         print(dataFrame.COMMAND)
+        print(dataFrame.DATA)
+        print(dataFrame.CRC16)
+        print(dataFrame.EOI)
+    
+    def test_2():
+        # Response data frame
+        responseData = b'~S\x00\x00\x00\xb2\x00\x00}\xff[C\x00\x00\x00\x00\xe0\xff\x9f@\x00\x00\x00\x00\x93\x7f\x89DR\xfbN\xbdl\x00\\C\x00\x00pC\xd6\x00\xa0@\x8f\x02pC\xff\x80\x89Dd5\xf1\xbd\xd2\xff[C\x00\x00\xf0B`\x00\xa0@\x1f\x05\xf0B6\x80\x89D\xa18\xc9\xbdd@NE\xebz\x88\xbe\xf5\x1c\xff'
+        dataFrame = ResponseDataFrame()
+        dataFrame.extractDataFrame(responseData)
+        print(dataFrame.SOI)
+        print(dataFrame.LEN)
+        print(dataFrame.COMMAND)
+        print(dataFrame.ERRORCODE)
         print(dataFrame.DATA)
         print(dataFrame.CRC16)
         print(dataFrame.EOI)
