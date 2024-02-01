@@ -44,7 +44,7 @@ class SerialMonitor:
         self.callback = onReceive
         self.runService = True
         self.isRunning = False
-        self.service = threading.Thread(target=self.serialWatcher, daemon=True)
+        self.service = threading.Thread(target=self.serialMonitor, daemon=True)
     
     def startMonitor(self):
         '''
@@ -58,21 +58,26 @@ class SerialMonitor:
             self.service.join()
             self.isRunning = True
 
-    def stopSerialMonitor(self):
+    def stopMonitor(self, isBlocking=True):
         '''
             Stop serial handler monitor
         '''
         print('[SerialHandler] starting serialMonitor')
         self.isRunning = False
+        if isBlocking:
+            while self.serviceIsActive:
+                time.sleep(0.1)
         
     def transaction(self, dataFrame:bytearray, timeout=10) -> bytearray:
         '''
             parameter
                 dataFrame (bytearray) data farme will be sent to test bench
+                timeout (int) how much time for waiting serial answer in second
         '''
         self.ser.write(dataFrame)
         d_initial = datetime.now()
-        while datetime.now() - d_initial < timedelta(seconds=timeout):
+        t_timeout = timedelta(seconds=timeout)
+        while datetime.now() - d_initial < t_timeout:
             if len(self.recvBuffer) == 0:
                 time.sleep(0.1)
                 continue
@@ -102,7 +107,9 @@ class SerialMonitor:
                         self.recvBuffer = tempBuffer
                         if self.callback != None:
                             self.callback(tempBuffer)
+                    break
         print('[SerialHandler] serialMonitor has been terminated')
+        self.serviceIsActive = False
             
 
     # def serialWatcher(self) -> None:
