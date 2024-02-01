@@ -120,22 +120,69 @@ class GenyTestBench(GenySys):
             
     def apply(self):
         if self.mode == GenyTestBench.Mode.ENERGY_ERROR_CALIBRATION:
-            self.energyErrorCalibration.apply(verbose=True)
+            buffer = self.energyErrorCalibration.setTestCommandForm(verbose=True)
+            result = self.serialMonitor.transaction(buffer)
+            self.response.extractDataFrame(result)
+            if self.response.getErrorCode() == 0:
+                return True
+            return False
+    
 
-geny = GenyTestBench('COM1', 9600)
-print('Connecting to Geny')
-print(geny.open())
-print('Closing port')
-print(geny.close())
 
-# geny.setMode(GenyTestBench.Mode.ENERGY_ERROR_CALIBRATION)
-# geny.setPowerSelector(PowerSelector._3P4W_ACTIVE)
-# geny.setVoltageRange(VoltageRange.YC99T_5C._220V)
-# geny.setVoltage(220.0)
-# geny.setCurrent(5.0)
-# geny.setFrequency(50.0)
-# geny.apply()
+if __name__ == '__main__':
+    import time
+    
+    geny = GenyTestBench('COM1', 9600)
+    geny.setMode(GenyTestBench.Mode.ENERGY_ERROR_CALIBRATION)
+        
+    def login_logout():
+        print('[login_logout] opening port')
+        print(geny.open())
+        print('[login_logout] closing port')
+        print(geny.close())
+        exit()
 
-import time
-while True:
-    time.sleep(1)
+    def apply_voltage():
+        print('[apply_voltage] opening port')
+        print(geny.open())
+        print('[apply_voltage] set power selector')
+        geny.setPowerSelector(PowerSelector._3P4W_ACTIVE)
+        
+        # channel selector
+        elementSelector = (
+            ElementSelector.EnergyErrorCalibration._A_ELEMENT,
+            ElementSelector.EnergyErrorCalibration._B_ELEMENT,
+            ElementSelector.EnergyErrorCalibration._C_ELEMENT,
+            ElementSelector.EnergyErrorCalibration._COMBINE_ALL
+        )
+        for element in elementSelector:
+            print(f'[apply_voltage] set channel selector: {element}')        
+        
+            print('[apply_voltage] set voltage range')
+            geny.setVoltageRange(VoltageRange.YC99T_5C._220V)
+            print('[apply_voltage] set voltage')
+            geny.setVoltage(220)
+            print('[apply_voltage] apply test bench configuration')
+            result = geny.apply()
+            if result == False:
+                print('[apply_voltage] could not satisfied your command')
+                print('[apply_voltage] closing port')
+                geny.close()
+                exit(1)
+            
+            timeWait = 5
+            for i in range(timeWait):
+                print(f'[apply_voltage] wait {timeWait-1-i}')
+                time.sleep(1)
+
+    # Test Case
+    login_logout()
+    apply_voltage()
+
+    timeWait = 10
+    for i in range(timeWait):
+        print(f'Wait {timeWait-1-i}')
+        time.sleep(1)
+
+    print('[apply_voltage] closing port')
+    print(geny.close())

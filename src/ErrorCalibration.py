@@ -196,9 +196,7 @@ class EnergyErrorCalibration:
             self.info()
         
         print('[EnergyCalibration] Applying configuration')
-        testCommandBuffer = bytes(self.setTestCommandForm())
-        print(testCommandBuffer.hex())
-        print(self.commandDataFrame.toDict())
+        return self.setTestCommandForm()
     
     def info(self):
         print('========================================')
@@ -215,11 +213,14 @@ class EnergyErrorCalibration:
         print(f"Meter Constant              : {self.meterConstant}")
         print(f"Calibratino Measure Cycle   : {self.calibMeasurementCycle}")
     
-    def setTestCommandForm(self):
+    def setTestCommandForm(self, verbose= False):
         '''
             Set test command form
             # return data frame in list for test command GENY mode Energy Error Calibration. Refer to Energy Error Calibration test command in Geny documentation.
         '''
+        if verbose:
+            self.info()
+            
         register = ( # NOTE: Please don't change the arrangemet
             self.powerSelector.enum,
             self.elementSelection.enum,
