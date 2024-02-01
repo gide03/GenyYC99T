@@ -1,5 +1,10 @@
 import struct
 
+class VoltageRangeError(Exception):
+    pass
+
+class CurrentRangeError(Exception):
+    pass
 class CommmandDataFrame:
     SOI_BIT_LENGTH = 1
     DATA_FRAME_BIT_LENGTH = 4
@@ -97,6 +102,8 @@ class CommmandDataFrame:
         output.extend(temp)   
         output.extend(crc_)     
         output.append(CommmandDataFrame.EOI_CONSTANT)
+        
+        self.extractDataFrame(output)
         return output.copy()
 
 class ResponseDataFrame:
@@ -157,36 +164,78 @@ class ResponseDataFrame:
         self.CRC16 = _CRC16
         self.EOI = _EOI
 
-class Util:  
-    class YC99T_5C:
-        class VoltageRange:
-            _100V = 6
-            _220V = 7
-            _380V = 8
-        
-        class CurrentRange:
-            _50mA = 7
-            _200mA = 8
-            _1A = 9
-            _5A = 10
-            _20A = 11
-            _100A = 12
+class Selector:
+    def __init__(self, enum, description):
+        self.enum = enum
+        self.description = description
 
-    class YC99T_3C:
-        class VoltageRange:
-            _100V = 6
-            _220V = 7
-            _380V = 8
-            _660V = 9
+class ElementSelector:
+    class EnergyErrorCalibration(Selector):
+        _COMBINE_ALL            = Selector(0x00, '')
+        _A_ELEMENT              = Selector(0x01, '')
+        _B_ELEMENT              = Selector(0x02, '')
+        _C_ELEMENT              = Selector(0x03, '')
+        _PHASE_ABC_OUTPUT       = Selector(0x04, '')
+        _PHASE_AB_OUTPUT        = Selector(0x05, '')
+        _PHASE_A_OUTPUT         = Selector(0x06, '')
+    
+    class ThreePhaseAcStandard(Selector):
+        _COMBINE_ALL            = Selector(0x00, '')
+        _A_ELEMENT              = Selector(0x01, '')
+        _B_ELEMENT              = Selector(0x02, '')
+        _C_ELEMENT              = Selector(0x03, '')
         
-        class CurrentRange:
-            _50mA = 7
-            _200mA = 8
-            _1A = 9
-            _5A = 10
-            _16_667A = 11
-            _100A = 12
-            
+class PowerSelector(Selector):
+    _3P4W_ACTIVE            = Selector(0x00, '')
+    _3P3W_ACTIVE            = Selector(0x01, '')
+    _SINGLE_PHASE_ACTIVE    = Selector(0x02, '')
+    _3P4W_REAL_REACTIVE     = Selector(0x03, '')
+    _3P3W_REAL_REACTIVE     = Selector(0x04, '')
+    _2_ELEMENTS_60_REACTIVE = Selector(0x05, '')
+    _2_ELEMENTS_90_REACTIVE = Selector(0x06, '')
+    _3_ELEMENTS_90_REACTIVE = Selector(0x07, '')
+        
+class RangeLevel:
+    def __init__(self, enum, nominal):
+        self.enum = enum
+        self.nominal = nominal
+
+class VoltageRange:
+    class YC99T_5C(RangeLevel):
+        _100V = RangeLevel(6, 100.0)
+        _220V = RangeLevel(7, 220.0)
+        _380V = RangeLevel(8, 380.0)    
+    class YC99T_3C:
+        _100V = RangeLevel(6, 100.0)
+        _220V = RangeLevel(7, 220.0)
+        _380V = RangeLevel(8, 380.0)
+        _660V = RangeLevel(9, 660.0)
+
+class CurrentRange:
+    class YC99T_5C:
+        _50mA = RangeLevel(7, 0.050)
+        _200mA = RangeLevel(8, 0.200)
+        _1A = RangeLevel(9, 1.9)
+        _5A = RangeLevel(10, 5.9)
+        _20A = RangeLevel(11, 20.9)
+        _100A = RangeLevel(12, 100.9)
+    
+    class YC99T_3C:
+        _50mA = 7
+        _200mA = 8
+        _1A = 9
+        _5A = 10
+        _16_667A = 11
+        _100A = 12
+        
+        _NOM_50mA = 0.050
+        _NOM_200mA = 0.200
+        _NOM_1A = 1
+        _NOM_5A = 5
+        _NOM_16_667A = 16.667
+        _NOM_100A = 100
+
+class Util:         
     ct_ArrayCRCHi = [
         0x00, 0xC1, 0x81, 0x40, 0x01, 0xC0, 0x80, 0x41, 0x01, 0xC0,
         0x80, 0x41, 0x00, 0xC1, 0x81, 0x40, 0x01, 0xC0, 0x80, 0x41,
@@ -319,138 +368,137 @@ class Util:
             #TODO: Convert for big endia
             pass
 
-    def genDataFrame(command:int, data:list)->list:
-        '''
-            generate geny command dataframe (refer to AT-PRO-YC99T documentation)
-        '''
-        FLAG_SOI = 0x7e
-        FLAG_EOI = 0xff
+    # def genDataFrame(command:int, data:list)->list:
+    #     '''
+    #         generate geny command dataframe (refer to AT-PRO-YC99T documentation)
+    #     '''
+    #     FLAG_SOI = 0x7e
+    #     FLAG_EOI = 0xff
 
-        temp = []
-        # create COMMAND + DATA field
-        temp.append(command)
-        temp.append(0x00)
-        temp.extend(data)
+    #     temp = []
+    #     # create COMMAND + DATA field
+    #     temp.append(command)
+    #     temp.append(0x00)
+    #     temp.extend(data)
 
-        # create crc field
-        crc_ = Util.calc_CRC(temp[:])
+    #     # create crc field
+    #     crc_ = Util.calc_CRC(temp[:])
 
-        # create length field
-        data_length = Util.uint2byteList(len(temp))
+    #     # create length field
+    #     data_length = Util.uint2byteList(len(temp))
 
-        # join fields
-        output = [FLAG_SOI]
-        output.extend(data_length)
-        output.extend(temp)   
-        output.extend(crc_)     
-        output.append(FLAG_EOI)
-        return output.copy()
+    #     # join fields
+    #     output = [FLAG_SOI]
+    #     output.extend(data_length)
+    #     output.extend(temp)   
+    #     output.extend(crc_)     
+    #     output.append(FLAG_EOI)
+    #     return output.copy()
 
-    def extractDFInfo(self, data_frame:list) -> dict:
-        '''
-            Separate information foreach data field
-        '''
-        FLAG_SOI = 0x7e
-        FLAG_EOI = 0xff
-        SOI_BLENGTH = 1
-        DF_BLENGTH = 4
-        COMMAND_BLENGTH = 2
-        ERROR_CODE_BLENGTH = 1
-        CRC16_BLENGTH = 2
-        EOI_BLENGTH = 1
+    # def extractDFInfo(self, data_frame:list) -> dict:
+    #     '''
+    #         Separate information foreach data field
+    #     '''
+    #     FLAG_SOI = 0x7e
+    #     FLAG_EOI = 0xff
+    #     SOI_BLENGTH = 1
+    #     DF_BLENGTH = 4
+    #     COMMAND_BLENGTH = 2
+    #     ERROR_CODE_BLENGTH = 1
+    #     CRC16_BLENGTH = 2
+    #     EOI_BLENGTH = 1
 
-        # Protection for empty datframe
-        if len(data_frame) == 0 or data_frame == None:
-            result = {
-                'SOI'                 : None,
-                'DATA_FRAME_LENGTH'   : None,
-                'COMMAND'             : None,
-                'ERROR_CODE'          : "ERROR. Empty data frame. Source: SerialHandler.py::transaction",
-                'DATA'                : None,
-                'CRC'                 : None
-            }
-            return result
+    #     # Protection for empty datframe
+    #     if len(data_frame) == 0 or data_frame == None:
+    #         result = {
+    #             'SOI'                 : None,
+    #             'DATA_FRAME_LENGTH'   : None,
+    #             'COMMAND'             : None,
+    #             'ERROR_CODE'          : "ERROR. Empty data frame. Source: SerialHandler.py::transaction",
+    #             'DATA'                : None,
+    #             'CRC'                 : None
+    #         }
+    #         return result
         
-        # Protection for invalid flag
-        if data_frame[0] == FLAG_SOI and data_frame[-1] == FLAG_EOI:
-            pass
-        else:
-            print(f'Wrong dataframe format (INVALID FLAG)')
-            result = {
-                'SOI'                 : None,
-                'DATA_FRAME_LENGTH'   : None,
-                'COMMAND'             : None,
-                'ERROR_CODE'          : f"ERROR. Wrong dataframe format (INVALID FLAG). SOI:{hex(data_frame[0])} EOI:{hex(data_frame[-1])}",
-                'DATA'                : None,
-                'CRC'                 : None
-            }
-            return result
+    #     # Protection for invalid flag
+    #     if data_frame[0] == FLAG_SOI and data_frame[-1] == FLAG_EOI:
+    #         pass
+    #     else:
+    #         print(f'Wrong dataframe format (INVALID FLAG)')
+    #         result = {
+    #             'SOI'                 : None,
+    #             'DATA_FRAME_LENGTH'   : None,
+    #             'COMMAND'             : None,
+    #             'ERROR_CODE'          : f"ERROR. Wrong dataframe format (INVALID FLAG). SOI:{hex(data_frame[0])} EOI:{hex(data_frame[-1])}",
+    #             'DATA'                : None,
+    #             'CRC'                 : None
+    #         }
+    #         return result
 
-        # Start parsing
-        try:
-            data_frame_blok_1 = [] # Fetch bytes from SOI until ERROR_CODE
-            for i in (SOI_BLENGTH, DF_BLENGTH, COMMAND_BLENGTH, ERROR_CODE_BLENGTH):
-                x = []
-                for j in range(0,i):
-                    x .append(data_frame.pop(0))
-                data_frame_blok_1.append(x)
+    #     # Start parsing
+    #     try:
+    #         data_frame_blok_1 = [] # Fetch bytes from SOI until ERROR_CODE
+    #         for i in (SOI_BLENGTH, DF_BLENGTH, COMMAND_BLENGTH, ERROR_CODE_BLENGTH):
+    #             x = []
+    #             for j in range(0,i):
+    #                 x .append(data_frame.pop(0))
+    #             data_frame_blok_1.append(x)
                 
-            data_frame_blok_2 = [] # Fetch dataframe CRC and EOI
-            for i in (EOI_BLENGTH, CRC16_BLENGTH):
-                x = []
-                for j in range(0,i):
-                    x.append(data_frame.pop(-1 - ((i-1)-j)))
-                data_frame_blok_2.append(x)
+    #         data_frame_blok_2 = [] # Fetch dataframe CRC and EOI
+    #         for i in (EOI_BLENGTH, CRC16_BLENGTH):
+    #             x = []
+    #             for j in range(0,i):
+    #                 x.append(data_frame.pop(-1 - ((i-1)-j)))
+    #             data_frame_blok_2.append(x)
 
-            data_frame_output = data_frame_blok_1
-            data_frame_output.append(data_frame)
-            data_frame_output.append(data_frame_blok_2[-1])
-            data_frame_output.append(data_frame_blok_2[0])
+    #         data_frame_output = data_frame_blok_1
+    #         data_frame_output.append(data_frame)
+    #         data_frame_output.append(data_frame_blok_2[-1])
+    #         data_frame_output.append(data_frame_blok_2[0])
 
-            temp = []
-            temp.extend(data_frame_output[2])
-            temp.extend(data_frame_output[3])
-            temp.extend(data_frame)
-            crc = Util.calc_CRC(temp)
-            if crc == data_frame_output[5]:
-                result = {
-                    'SOI'                 : data_frame_output[0][0],
-                    'DATA_FRAME_LENGTH'   : Util.leHex2uint(data_frame_output[1],4),
-                    'COMMAND'             : Util.leHex2uint(data_frame_output[2],2),
-                    'ERROR_CODE'          : data_frame_output[3][0],
-                    'DATA'                : data_frame[:],
-                    'CRC'                 : data_frame_output[5]
-                }
-                return result
-            else:
-                with open(f'{_CURRENT_PATH}/SerialHandler_error','a+') as f: # Log error
+    #         temp = []
+    #         temp.extend(data_frame_output[2])
+    #         temp.extend(data_frame_output[3])
+    #         temp.extend(data_frame)
+    #         crc = Util.calc_CRC(temp)
+    #         if crc == data_frame_output[5]:
+    #             result = {
+    #                 'SOI'                 : data_frame_output[0][0],
+    #                 'DATA_FRAME_LENGTH'   : Util.leHex2uint(data_frame_output[1],4),
+    #                 'COMMAND'             : Util.leHex2uint(data_frame_output[2],2),
+    #                 'ERROR_CODE'          : data_frame_output[3][0],
+    #                 'DATA'                : data_frame[:],
+    #                 'CRC'                 : data_frame_output[5]
+    #             }
+    #             return result
+    #         else:
+    #             with open(f'{_CURRENT_PATH}/SerialHandler_error','a+') as f: # Log error
 
-                    f.write('Invalid CRC')
-                    f.write(f'Data field: {data_frame}')
-                    f.write(f'CRC calculation: {crc}')
-                    f.write('\n')
-                result = {
-                    'SOI'                 : None,
-                    'DATA_FRAME_LENGTH'   : None,
-                    'COMMAND'             : None,
-                    'ERROR_CODE'          : "ERROR. Broken data (CRC not match)",
-                    'DATA'                : [],
-                    'CRC'                 : []
-                }
-                return result
-        except:
-            print('exception')
-            result = {
-                'SOI'                 : None,
-                'DATA_FRAME_LENGTH'   : None,
-                'COMMAND'             : None,
-                'ERROR_CODE'          : "Got exception",
-                'DATA'                : [],
-                'CRC'                 : []
-            }
-            return result
-        
-        
+    #                 f.write('Invalid CRC')
+    #                 f.write(f'Data field: {data_frame}')
+    #                 f.write(f'CRC calculation: {crc}')
+    #                 f.write('\n')
+    #             result = {
+    #                 'SOI'                 : None,
+    #                 'DATA_FRAME_LENGTH'   : None,
+    #                 'COMMAND'             : None,
+    #                 'ERROR_CODE'          : "ERROR. Broken data (CRC not match)",
+    #                 'DATA'                : [],
+    #                 'CRC'                 : []
+    #             }
+    #             return result
+    #     except:
+    #         print('exception')
+    #         result = {
+    #             'SOI'                 : None,
+    #             'DATA_FRAME_LENGTH'   : None,
+    #             'COMMAND'             : None,
+    #             'ERROR_CODE'          : "Got exception",
+    #             'DATA'                : [],
+    #             'CRC'                 : []
+    #         }
+    #         return result
+          
 if __name__ == '__main__':
     
     def test_1():
