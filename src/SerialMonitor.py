@@ -74,15 +74,17 @@ class SerialMonitor:
                 dataFrame (bytearray) data farme will be sent to test bench
                 timeout (int) how much time for waiting serial answer in second
         '''
+        self.recvBuffer = b''
         self.ser.write(dataFrame)
         d_initial = datetime.now()
         t_timeout = timedelta(seconds=timeout)
         while datetime.now() - d_initial < t_timeout:
-            if len(self.recvBuffer) == 0:
+            if self.recvBuffer == b'':
                 time.sleep(0.1)
                 continue
             temp = self.recvBuffer
             self.recvBuffer = b''
+            print(f'[SerialMonitor] Transaction {temp}')
             return temp
         return b''
 
@@ -96,18 +98,18 @@ class SerialMonitor:
         print('[SerialHandler] serialMonitor started')
         while self.runService:
             self.serviceIsActive = True
-            self.recvBuffer = b''
+            # self.recvBuffer = b''
             tempBuffer = b''
             while self.runService:
                 temp = self.ser.read()
-                if len(temp) > 0:
-                    tempBuffer += tempBuffer
+                if temp != b'':
+                    tempBuffer += temp
                 else: # enter this block if serial not detect incoming data (refer timeout parameter on class Serial)
                     if len(tempBuffer) > 0:
                         self.recvBuffer = tempBuffer
                         if self.callback != None:
                             self.callback(tempBuffer)
-                    break
+                        break
         print('[SerialHandler] serialMonitor has been terminated')
         self.serviceIsActive = False
             

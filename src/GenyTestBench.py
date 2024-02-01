@@ -1,13 +1,19 @@
 from typing import Union
 from Util import Util, VoltageRange, VoltageRangeError, ElementSelector, PowerSelector
+from Util import CommmandDataFrame, ResponseDataFrame
 from SerialMonitor import SerialMonitor
 from ErrorCalibration import EnergyErrorCalibration
+from GenySystemCommand import GenySys
 
-class GenyTestBench:
+class GenyTestBench(GenySys):
     class Mode:
         ENERGY_ERROR_CALIBRATION = 1
             
     def __init__(self, usbport, baudrate:int=115200):
+        super().__init__()
+        
+        self.response = ResponseDataFrame()
+        
         self.usbport = usbport
         self.baudrate = baudrate
         
@@ -19,6 +25,9 @@ class GenyTestBench:
         
         # Set mode
         self.setMode(self.mode)
+        
+        self.serialMonitor.startMonitor()
+        
     
     def setMode(self, mode:Mode):
         self.mode = mode
@@ -27,10 +36,28 @@ class GenyTestBench:
     
     # Callback function
     def onSerialReceived(self, dataframe:bytearray):
+        # print('[onSerialReceived] received incoming data')
+        # print(dataframe)
         pass
 
 
     # API
+    def open(self):
+        buffer = self.connect()
+        result = self.serialMonitor.transaction(buffer)
+        self.response.extractDataFrame(result)
+        if self.response.getErrorCode() == 0:
+            return True
+        return False
+    
+    def close(self):
+        buffer = self.disconnect()
+        result = self.serialMonitor.transaction(buffer)
+        self.response.extractDataFrame(result)
+        if self.response.getErrorCode() == 0:
+            return True
+        return False
+    
     def setElementSelector(self, elementSelector:[ElementSelector.EnergyErrorCalibration, ElementSelector.ThreePhaseAcStandard]):
         '''
             combine or separate element selction
@@ -95,11 +122,20 @@ class GenyTestBench:
         if self.mode == GenyTestBench.Mode.ENERGY_ERROR_CALIBRATION:
             self.energyErrorCalibration.apply(verbose=True)
 
-geny = GenyTestBench('COM1')
-geny.setMode(GenyTestBench.Mode.ENERGY_ERROR_CALIBRATION)
-geny.setPowerSelector(PowerSelector._3P4W_ACTIVE)
-geny.setVoltageRange(VoltageRange.YC99T_5C._220V)
-geny.setVoltage(220.0)
-geny.setCurrent(5.0)
-geny.setFrequency(50.0)
-geny.apply()
+geny = GenyTestBench('COM1', 9600)
+print('Connecting to Geny')
+print(geny.open())
+print('Closing port')
+print(geny.close())
+
+# geny.setMode(GenyTestBench.Mode.ENERGY_ERROR_CALIBRATION)
+# geny.setPowerSelector(PowerSelector._3P4W_ACTIVE)
+# geny.setVoltageRange(VoltageRange.YC99T_5C._220V)
+# geny.setVoltage(220.0)
+# geny.setCurrent(5.0)
+# geny.setFrequency(50.0)
+# geny.apply()
+
+import time
+while True:
+    time.sleep(1)

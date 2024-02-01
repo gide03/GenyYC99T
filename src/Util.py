@@ -129,6 +129,9 @@ class ResponseDataFrame:
         
         self.errorMessage = ''
     
+    def getErrorCode(self):
+        return self.ERRORCODE[0]
+    
     def extractDataFrame(self, dataFrame:bytearray):
         '''
             Extract information inside Response data frame
@@ -164,6 +167,19 @@ class ResponseDataFrame:
         self.CRC16 = _CRC16
         self.EOI = _EOI
 
+    def toDict(self) -> dict:
+        '''
+            Get dictionary contained data frame information
+        '''
+        return {
+            'SOI' : self.SOI,
+            'LEN' : self.LEN,
+            'COMMAND' : self.COMMAND,
+            "ERRORCODE": self.ERRORCODE,
+            'DATA' : self.DATA,
+            'CRC16' : self.CRC16,
+            'EOI' : self.EOI
+        }
 class Selector:
     def __init__(self, enum, description):
         self.enum = enum
