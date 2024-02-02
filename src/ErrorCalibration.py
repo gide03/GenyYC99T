@@ -7,8 +7,28 @@ class Register:
         self.name = name
         self.dtype = dtype
         self.size = size
-        self.value = 0
+        self.value = None
+        self.rawValue = []
         
+    def setRawValue(self, rawValue:list):
+        '''
+            will also calculate the value
+        '''
+        self.rawValue = rawValue
+        self.value = self.castValue()
+    
+    def castValue(self):
+        '''
+            transform raw value to specified data type
+        '''
+        if isinstance(self.rawValue, list):
+            if self.dtype == float:
+                return Util.Hex2float(value=self.rawValue, size=self.size)
+            elif self.dtype == int:
+                return Util.Hex2uint(value=self.rawValue, size=self.size)
+            elif self.dtype == bool:
+                return False if self.rawValue == [0] else True
+            
 class EnergyErrorCalibration:
     class ReadbackSamplingDataRegister(Register):
         def __init__(self):
@@ -64,7 +84,7 @@ class EnergyErrorCalibration:
                 raise TypeError(f'dataFrame expect ResponseDataFrame not {type(dataFrame)}')
             
             data = dataFrame.DATA
-            if len(data) == len(self.registerList*4):
+            if len(data) == len(self.registerList)*4:
                 pass
             else:
                 raise DatFrameError(f'Dataframe length not comply {len(self.registerList)*4}')
@@ -74,6 +94,40 @@ class EnergyErrorCalibration:
                 reg.value = Util.Hex2float(val, size=reg.size)
             return self.getValue()
         
+    class ReadBackErrorSamplingDataRegister(Register):
+        def __init__(self):
+            self.ValidFlagBit = Register('Valid Flag Bit', bool, 1)
+            self.MeterError1 = Register('Meter 1 Error', float, 4)
+            self.MeterError2 = Register('Meter 2 Error', float, 4)
+            self.MeterError3 = Register('Meter 3 Error', float, 4)
+            
+            self.registerList = (
+                self.ValidFlagBit,
+                self.MeterError1,
+                self.MeterError2,
+                self.MeterError3
+            )
+        
+        def extranctResponseDataFrame(self, dataFrame:ResponseDataFrame):
+            if not isinstance(dataFrame, ResponseDataFrame):
+                raise TypeError(f'dataFrame expect ResponseDataFrame not {type(dataFrame)}')
+            
+            data = dataFrame.DATA
+            requiredDataLenght = sum([reg.size for reg in self.registerList])
+            if len(data) >= requiredDataLenght:
+                pass
+            else:
+                raise DatFrameError(f'Dataframe length not comply {requiredDataLenght}')
+            
+            for register in self.registerList:
+                temp = []
+                for i in range(register.size):
+                    temp.append(data.pop(0))
+                print(f'Set register {register.name} raw data: {temp}')
+                register.setRawValue(temp)
+                
+            return self.registerList
+            
     class Buffer:
         def __init__(self):
             self.POWER_SELECTION = 0
@@ -114,6 +168,7 @@ class EnergyErrorCalibration:
         
         self.commandDataFrame = CommmandDataFrame()
         self.readbackSamplingRegister = EnergyErrorCalibration.ReadbackSamplingDataRegister()
+        self.errorSamplingRegister = EnergyErrorCalibration.ReadBackErrorSamplingDataRegister()
     
     #
     # Internal Util
@@ -213,6 +268,16 @@ class EnergyErrorCalibration:
                 powerFactorUnit (PFUnit) power factor characteristic
         '''
         self.powerFactorUnit = powerFactorUnit        
+        
+    # SET CALIBRATION CYCLE
+    def setCalibrationConstants(self, meterConstant:int, cycle:int):
+        '''
+            parameters:
+                meterConstant (int) meter LED blink constant per energy unit
+                value (int) number of measurement cycles
+        '''
+        self.meterConstant = meterConstant
+        self.calibMeasurementCycle = cycle
     #
     
     # SEND DATA
@@ -300,61 +365,11 @@ class EnergyErrorCalibration:
         df.append(control_flag_bit)
         df = self.commandDataFrame.genDataFrame(EnergyErrorCalibration.Command.READBACK_SAMPLING_DATA, df)
         return df
-        
-    # def readbackSamplingTranslator(self,data:dict) -> dict:
-    #     '''
-    #         parameter data has structure as following
-    #         {   
-    #             "SOI": _soi,
-    #             "COMMAND" : 0xc1,
-    #             "ERROR_CODE": _err_code,
-    #             "DATA": [...],
-    #             "CRC": [LowByte_CRC, HighByte_CRC]
-    #         }
-
-    #         this function expects got data value from SerialHandler::transaction(), so you no need to worry about data structure
-    #     '''
-    #     registers = {
-    #         'Ua_amplitude'          : 0.0,
-    #         'Ua_phase'              : 0.0,
-    #         'Ia_amplitude'          : 0.0,
-    #         'Ia_phase'              : 0.0,
-    #         'Pa'                    : 0.0,
-    #         'Qa'                    : 0.0,
-
-    #         'Ub_amplitude'          : 0.0,
-    #         'Ub_phase'              : 0.0,
-    #         'Ib_amplitude'          : 0.0,
-    #         'Ib_phase'              : 0.0,
-    #         'Pb'                    : 0.0,
-    #         'Qb'                    : 0.0,
-
-    #         'Uc_amplitude'          : 0.0,
-    #         'Uc_phase'              : 0.0,
-    #         'Ic_amplitude'          : 0.0,
-    #         'Ic_phase'              : 0.0,
-    #         'Pc'                    : 0.0,
-    #         'Qc'                    : 0.0,
-
-    #         'P'                     : 0.0,
-    #         'Q'                     : 0.0
-    #     }
-    #     if data['ERROR_CODE'] == 0:
-    #         if len(data['DATA']) == 80:
-    #             for idx,i in enumerate(registers):
-    #                 temp = []
-    #                 for j in range(4):
-    #                     temp.append(data['DATA'].pop(0))
-    #                 registers[i] = Util.Hex2float(temp)
-    #             registers['Sa'] = math.hypot(registers['Pa'],registers['Qa'])
-    #             registers['Sb'] = math.hypot(registers['Pb'],registers['Qb'])
-    #             registers['Sc'] = math.hypot(registers['Pc'],registers['Qc'])
-    #             registers['S'] = math.hypot(registers['P'],registers['Q'])
-    #             return registers.copy()
-    #     return {}
     
     def readbackErrorSampling(self, count:int=1) -> list:
         '''
+            NOTE: I still not understand, is there a miss understanding. In the documentation error sampling readback is 0xd4 not 0xd5
+            
             return data frame in list to request test bench feedback
         '''
         data = []
@@ -366,43 +381,5 @@ class EnergyErrorCalibration:
             control_flag_bit = 2
 
         data.append(control_flag_bit)
-        data = Util.genDataFrame(EnergyErrorCalibration.Command.READBACK_ERROR_SAMPLING, data)
-        return data.copy()
-
-    def errorSamplingTranslator(self, data:dict) -> dict:
-        '''
-            parameter data has structure as following
-            {   
-                "SOI": _soi,
-                "COMMAND" : 0xc1,
-                "ERROR_CODE": _err_code,
-                "DATA": [...],
-                "CRC": [LowByte_CRC, HighByte_CRC]
-            }
-
-            this function expects got data value from SerialHandler::transaction(), so you no need to worry about data structure
-        '''
-        registers = {
-            'valid flag bit'        : 0.0,
-            'meter 1 error valid'   : 0.0,
-            'meter 2 error valid'   : 0.0,
-            'meter 3 error valid'   : 0.0,
-        }
-
-        if data['ERROR_CODE'] == 0:           
-            validBitFlag = data['DATA'].pop(0)
-            errors = []
-            for i in range(3):
-                temp = []
-                for i in range(4):
-                    temp.append(data['DATA'].pop(0))
-                errors.append(Util.Hex2float(temp))
-
-            registers['valid flag bit'] = validBitFlag
-            registers['meter 1 error valid'] = errors[0]
-            registers['meter 2 error valid'] = errors[1]
-            registers['meter 3 error valid'] = errors[2]
-            return registers.copy()
-        
-if __name__ == '__main__':
-    print('Hello world')
+        df = self.commandDataFrame.genDataFrame(EnergyErrorCalibration.Command.READBACK_ERROR_SAMPLING, data)
+        return df

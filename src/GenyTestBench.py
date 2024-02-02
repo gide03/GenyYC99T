@@ -1,6 +1,6 @@
 from typing import Union
 from Util import Util, VoltageRange, VoltageRangeError, ElementSelector, PowerSelector
-from Util import CommmandDataFrame, ResponseDataFrame
+from Util import ResponseDataFrame
 from SerialMonitor import SerialMonitor
 from ErrorCalibration import EnergyErrorCalibration
 from GenySystemCommand import GenySys
@@ -46,6 +46,9 @@ class GenyTestBench(GenySys):
     def open(self):
         buffer = self.connect()
         result = self.serialMonitor.transaction(buffer)
+        if result == b'':
+            raise TimeoutError
+        
         self.response.extractDataFrame(result)
         if self.response.getErrorCode() == 0:
             return True
@@ -138,6 +141,15 @@ class GenyTestBench(GenySys):
                 value (int|EnergyErrorCalibration.PFUnit) enumeration of power factor unit (There are No Unit, L, C), refer to geny documentation
         '''
         self.energyErrorCalibration.setPowerFactorUnit(value)
+    
+    def setCalibrationConstants(self, meterConstant:int, cycle:int):
+        '''
+            parameters:
+                meterConstant (int) meter LED blink constant per energy unit
+                value (int) number of measurement cycles
+        '''
+        if self.mode == GenyTestBench.Mode.ENERGY_ERROR_CALIBRATION:
+            self.energyErrorCalibration.setCalibrationConstants(meterConstant, cycle)
         
     def apply(self):
         '''
@@ -166,8 +178,26 @@ class GenyTestBench(GenySys):
                 for reg in samplingRegister:
                     print(f'{reg.name} -> {reg.value}')
             return samplingRegister
+        
+    def readBackError(self, verbose=False):
+        if self.mode == GenyTestBench.Mode.ENERGY_ERROR_CALIBRATION:
+            buffer = self.energyErrorCalibration.readbackErrorSampling()
+            result = self.serialMonitor.transaction(buffer)
+            self.response.extractDataFrame(result)
+            print(f'Response: {self.response.toDict()}')
             
-
+            errorRegister = self.energyErrorCalibration.errorSamplingRegister.extranctResponseDataFrame(self.response)
+            
+            if verbose == True:
+                print('================================')
+                print('READ BACK ERROR')
+                print('================================')
+                for reg in errorRegister:
+                    if isinstance(reg.dtype, float):
+                        print(f'{reg.name} -> {reg.value:.5f}')
+                    else:
+                        print(f'{reg.name} -> {reg.value}')
+            return errorRegister
 
 if __name__ == '__main__':
     import time
@@ -329,6 +359,46 @@ if __name__ == '__main__':
             input('Enter to continue')
         print('[apply_voltage] closing port')    
         geny.close()
+        
+    def readback_error_sampling():
+        print('[apply_voltage] opening port')
+        print(geny.open())
+        print('[apply_voltage] set power selector')
+        geny.setPowerSelector(PowerSelector._3P4W_ACTIVE)
+        
+        # channel selector
+        elementSelector = (
+            # ElementSelector.EnergyErrorCalibration._A_ELEMENT,
+            # ElementSelector.EnergyErrorCalibration._B_ELEMENT,
+            # ElementSelector.EnergyErrorCalibration._C_ELEMENT,
+            ElementSelector.EnergyErrorCalibration._COMBINE_ALL,
+        )
+        for element in elementSelector:
+            print(f'[apply_voltage] set channel selector: {element}')        
+            geny.setElementSelector(element)        
+            print('[apply_voltage] set voltage range')
+            geny.setVoltageRange(VoltageRange.YC99T_5C._220V)
+            print('[apply_voltage] set voltage')
+            geny.setVoltage(220)
+            print('[apply_voltage] set current')
+            geny.setCurrent(10)
+            print('[apply_voltage] set power factor')
+            geny.setPowerFactor(40, inDegree=True)
+            print('[apply_voltage] set calibration constants')
+            geny.setCalibrationConstants(1000, 5)
+            print('[apply_voltage] apply test bench configuration')
+            result = geny.apply()
+            print(f'[apply_voltage] result: {result}')
+            if result == False:
+                print('[apply_voltage] could not satisfied your command')
+                print('[apply_voltage] closing port')
+                geny.close()
+                exit(1)
+            geny.readBackSamplingData(verbose = True)
+            geny.readBackError(verbose = True)
+            input('Enter to continue')
+        print('[apply_voltage] closing port')    
+        geny.close()
     
     # Test Case
     login_logout()
@@ -336,3 +406,4 @@ if __name__ == '__main__':
     apply_current()
     readback_sampling_data()
     apply_power_factor()
+    readback_error_sampling()
