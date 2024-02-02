@@ -1,6 +1,6 @@
 from typing import Union, Tuple
-from Util import Util, ResponseDataFrame, CommmandDataFrame, VoltageRange, CurrentRange, PowerSelector, ElementSelector
-from Util import VoltageRangeError, CurrentRangeError, DatFrameError
+from ..Util import Util, ResponseDataFrame, CommmandDataFrame, VoltageRange, CurrentRange, PowerSelector, ElementSelector
+from ..Util import VoltageRangeError, CurrentRangeError, DatFrameError
 
 class Register:
     def __init__(self, name, dtype, size):

@@ -1,8 +1,8 @@
 # from . import Util
 
 from typing import Union
-from Util import Util, CommmandDataFrame, VoltageRange, CurrentRange, PowerSelector, ElementSelector
-from Util import VoltageRangeError, CurrentRangeError
+from ..Util import Util, CommmandDataFrame, VoltageRange, CurrentRange, PowerSelector, ElementSelector
+from ..Util import VoltageRangeError, CurrentRangeError
 import math
 
 class GenySys:

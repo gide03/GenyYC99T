@@ -1,10 +1,11 @@
-from typing import Union
-from Util import Util, VoltageRange, VoltageRangeError, ElementSelector, PowerSelector
-from Util import ResponseDataFrame
-from SerialMonitor import SerialMonitor
-from ErrorCalibration import EnergyErrorCalibration
-from GenySystemCommand import GenySys
 import math
+
+from typing import Union
+from .Util import VoltageRange, VoltageRangeError, ElementSelector, PowerSelector
+from .Util import ResponseDataFrame
+from .SerialMonitor import SerialMonitor
+from .protocol.ErrorCalibration import EnergyErrorCalibration
+from .protocol.GenySystemCommand import GenySys
 
 class GenyTestBench(GenySys):
     class Mode:
@@ -401,9 +402,9 @@ if __name__ == '__main__':
         geny.close()
     
     # Test Case
-    login_logout()
-    apply_voltage()
-    apply_current()
-    readback_sampling_data()
-    apply_power_factor()
-    readback_error_sampling()
+    # login_logout()
+    # apply_voltage()
+    # apply_current()
+    # readback_sampling_data()
+    # apply_power_factor()
+    # readback_error_sampling()
