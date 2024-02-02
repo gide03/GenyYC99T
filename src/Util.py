@@ -5,6 +5,10 @@ class VoltageRangeError(Exception):
 
 class CurrentRangeError(Exception):
     pass
+
+class DatFrameError(Exception):
+    pass
+
 class CommmandDataFrame:
     SOI_BIT_LENGTH = 1
     DATA_FRAME_BIT_LENGTH = 4
@@ -383,137 +387,6 @@ class Util:
         else:
             #TODO: Convert for big endia
             pass
-
-    # def genDataFrame(command:int, data:list)->list:
-    #     '''
-    #         generate geny command dataframe (refer to AT-PRO-YC99T documentation)
-    #     '''
-    #     FLAG_SOI = 0x7e
-    #     FLAG_EOI = 0xff
-
-    #     temp = []
-    #     # create COMMAND + DATA field
-    #     temp.append(command)
-    #     temp.append(0x00)
-    #     temp.extend(data)
-
-    #     # create crc field
-    #     crc_ = Util.calc_CRC(temp[:])
-
-    #     # create length field
-    #     data_length = Util.uint2byteList(len(temp))
-
-    #     # join fields
-    #     output = [FLAG_SOI]
-    #     output.extend(data_length)
-    #     output.extend(temp)   
-    #     output.extend(crc_)     
-    #     output.append(FLAG_EOI)
-    #     return output.copy()
-
-    # def extractDFInfo(self, data_frame:list) -> dict:
-    #     '''
-    #         Separate information foreach data field
-    #     '''
-    #     FLAG_SOI = 0x7e
-    #     FLAG_EOI = 0xff
-    #     SOI_BLENGTH = 1
-    #     DF_BLENGTH = 4
-    #     COMMAND_BLENGTH = 2
-    #     ERROR_CODE_BLENGTH = 1
-    #     CRC16_BLENGTH = 2
-    #     EOI_BLENGTH = 1
-
-    #     # Protection for empty datframe
-    #     if len(data_frame) == 0 or data_frame == None:
-    #         result = {
-    #             'SOI'                 : None,
-    #             'DATA_FRAME_LENGTH'   : None,
-    #             'COMMAND'             : None,
-    #             'ERROR_CODE'          : "ERROR. Empty data frame. Source: SerialHandler.py::transaction",
-    #             'DATA'                : None,
-    #             'CRC'                 : None
-    #         }
-    #         return result
-        
-    #     # Protection for invalid flag
-    #     if data_frame[0] == FLAG_SOI and data_frame[-1] == FLAG_EOI:
-    #         pass
-    #     else:
-    #         print(f'Wrong dataframe format (INVALID FLAG)')
-    #         result = {
-    #             'SOI'                 : None,
-    #             'DATA_FRAME_LENGTH'   : None,
-    #             'COMMAND'             : None,
-    #             'ERROR_CODE'          : f"ERROR. Wrong dataframe format (INVALID FLAG). SOI:{hex(data_frame[0])} EOI:{hex(data_frame[-1])}",
-    #             'DATA'                : None,
-    #             'CRC'                 : None
-    #         }
-    #         return result
-
-    #     # Start parsing
-    #     try:
-    #         data_frame_blok_1 = [] # Fetch bytes from SOI until ERROR_CODE
-    #         for i in (SOI_BLENGTH, DF_BLENGTH, COMMAND_BLENGTH, ERROR_CODE_BLENGTH):
-    #             x = []
-    #             for j in range(0,i):
-    #                 x .append(data_frame.pop(0))
-    #             data_frame_blok_1.append(x)
-                
-    #         data_frame_blok_2 = [] # Fetch dataframe CRC and EOI
-    #         for i in (EOI_BLENGTH, CRC16_BLENGTH):
-    #             x = []
-    #             for j in range(0,i):
-    #                 x.append(data_frame.pop(-1 - ((i-1)-j)))
-    #             data_frame_blok_2.append(x)
-
-    #         data_frame_output = data_frame_blok_1
-    #         data_frame_output.append(data_frame)
-    #         data_frame_output.append(data_frame_blok_2[-1])
-    #         data_frame_output.append(data_frame_blok_2[0])
-
-    #         temp = []
-    #         temp.extend(data_frame_output[2])
-    #         temp.extend(data_frame_output[3])
-    #         temp.extend(data_frame)
-    #         crc = Util.calc_CRC(temp)
-    #         if crc == data_frame_output[5]:
-    #             result = {
-    #                 'SOI'                 : data_frame_output[0][0],
-    #                 'DATA_FRAME_LENGTH'   : Util.leHex2uint(data_frame_output[1],4),
-    #                 'COMMAND'             : Util.leHex2uint(data_frame_output[2],2),
-    #                 'ERROR_CODE'          : data_frame_output[3][0],
-    #                 'DATA'                : data_frame[:],
-    #                 'CRC'                 : data_frame_output[5]
-    #             }
-    #             return result
-    #         else:
-    #             with open(f'{_CURRENT_PATH}/SerialHandler_error','a+') as f: # Log error
-
-    #                 f.write('Invalid CRC')
-    #                 f.write(f'Data field: {data_frame}')
-    #                 f.write(f'CRC calculation: {crc}')
-    #                 f.write('\n')
-    #             result = {
-    #                 'SOI'                 : None,
-    #                 'DATA_FRAME_LENGTH'   : None,
-    #                 'COMMAND'             : None,
-    #                 'ERROR_CODE'          : "ERROR. Broken data (CRC not match)",
-    #                 'DATA'                : [],
-    #                 'CRC'                 : []
-    #             }
-    #             return result
-    #     except:
-    #         print('exception')
-    #         result = {
-    #             'SOI'                 : None,
-    #             'DATA_FRAME_LENGTH'   : None,
-    #             'COMMAND'             : None,
-    #             'ERROR_CODE'          : "Got exception",
-    #             'DATA'                : [],
-    #             'CRC'                 : []
-    #         }
-    #         return result
           
 if __name__ == '__main__':
     
