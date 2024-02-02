@@ -22,72 +22,15 @@ class EnergyErrorCalibration:
         STOP_TEST_COMMAND = 0xd3
         READBACK_SAMPLING_DATA = 0xd2
         READBACK_ERROR_SAMPLING = 0xd5
-        
-    # class PowerSelection:
-    #     _3P4W_ACTIVE            = 0x00
-    #     _3P3W_ACTIVE            = 0x01
-    #     _SINGLE_PHASE_ACTIVE    = 0x02
-    #     _3P4W_REAL_REACTIVE     = 0x03
-    #     _3P3W_REAL_REACTIVE     = 0x04
-    #     _2_ELEMENTS_60_REACTIVE = 0x05
-    #     _2_ELEMENTS_90_REACTIVE = 0x06
-    #     _3_ELEMENTS_90_REACTIVE = 0x07
-    
-    # class ElementSelector:
-    #     _COMBINE_ALL            = 0x00
-    #     _A_ELEMENT              = 0x01
-    #     _B_ELEMENT              = 0x02
-    #     _C_ELEMENT              = 0x03
-    #     _PHASE_ABC_OUTPUT       = 0x04
-    #     _PHASE_AB_OUTPUT        = 0x05
-    #     _PHASE_A_OUTPUT         = 0x06
-    
+            
     class PFUnit:
         _NO_UNIT    = 0x00
         _L          = 0x01
         _C          = 0x02
     
-    # CMD_REGISTER = {
-    #     "TEST_COMMAND"                  : 0xd0,
-    #     "ONLINE_ADJUST_COMMAND"         : 0xd1,
-    #     "STOP_TEST_COMMAND"             : 0xd3,
-    #     "READBACK_SAMPLING_DATA"        : 0xd2,
-    #     "READBACK_ERROR_SAMPLING"       : 0xd5,
-    # }
-    
-    
-    # defaultBufferRegister = {
-    #     'power_selection'           : PowerSelection._3P4W_ACTIVE,
-    #     'element_selection'         : ElementSelector._COMBINE_ALL,
-    #     'U_range'                   : 8,
-    #     'U_amplitude'               : 0,
-    #     'I_amplitude'               : 0,
-    #     'pf_value'                  : 0,
-    #     'pf_unit'                   : PFUnit._L,
-    #     'frequency'                 : 50,
-    #     'meter constant'            : 0,
-    #     'calib cycle'               : 0
-    # }
-    # bufferRegister = defaultBufferRegister.copy()
-
-
-    def __init__(self):
-        # self.defaultBufferRegister = {
-        #     'power_selection'           : EnergyErrorCalibration.PowerSelection._3P4W_ACTIVE,
-        #     'element_selection'         : EnergyErrorCalibration.ElementSelector._COMBINE_ALL,
-        #     'U_range'                   : 8,
-        #     'U_amplitude'               : 0,
-        #     'I_amplitude'               : 0,
-        #     'pf_value'                  : 0,
-        #     'pf_unit'                   : EnergyErrorCalibration.PFUnit._L,
-        #     'frequency'                 : 50,
-        #     'meter constant'            : 0,
-        #     'calib cycle'               : 0
-        # }
-        # self.buffer = self.defaultBufferRegister.copy()
-        
+    def __init__(self):        
         self.powerSelector = PowerSelector._3P4W_ACTIVE
-        self.elementSelection = ElementSelector.EnergyErrorCalibration._COMBINE_ALL
+        self.elementSelector = ElementSelector.EnergyErrorCalibration._COMBINE_ALL
         self.voltageRange = VoltageRange.YC99T_5C._220V
         self.currentRange = CurrentRange.YC99T_5C._20A
         self.voltage = 0.0
@@ -203,7 +146,7 @@ class EnergyErrorCalibration:
         print('Summary Of Energy Error Calibration:')
         print('========================================')
         print(f"Power Selection             : {self.powerSelector.enum}")
-        print(f"Element Selection           : {self.elementSelection.enum}")
+        print(f"Element Selection           : {self.elementSelector.enum}")
         print(f"Voltage Range               : {self.voltageRange.enum}")
         print(f"Voltage Amplitude           : {self.voltage}")
         print(f"Current Amplitude           : {self.current}")
@@ -223,7 +166,7 @@ class EnergyErrorCalibration:
             
         register = ( # NOTE: Please don't change the arrangemet
             self.powerSelector.enum,
-            self.elementSelection.enum,
+            self.elementSelector.enum,
             self.voltageRange.enum,
             self.voltage,
             self.current,
