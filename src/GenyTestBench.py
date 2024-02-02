@@ -4,6 +4,7 @@ from Util import CommmandDataFrame, ResponseDataFrame
 from SerialMonitor import SerialMonitor
 from ErrorCalibration import EnergyErrorCalibration
 from GenySystemCommand import GenySys
+import math
 
 class GenyTestBench(GenySys):
     class Mode:
@@ -117,8 +118,31 @@ class GenyTestBench(GenySys):
                 frequency (float) the signal frequency
         '''
         self.frequency = frequency
+    
+    def setPowerFactor(self, value:float, inDegree:bool=False):
+        '''
+            params:
+                value (float) power factor input
+                inDegree (bool) if True the value will be considered as degree and will be convert to power factor
+        '''
+        if self.mode == GenyTestBench.Mode.ENERGY_ERROR_CALIBRATION:
+            powerFactor = value
+            if inDegree:
+                powerFactor = math.cos(math.radians(value))
             
+            self.energyErrorCalibration.setPowerFactor(powerFactor)
+    
+    def setPowerFactorUnit(self, value:EnergyErrorCalibration.PFUnit):
+        '''
+            params:
+                value (int|EnergyErrorCalibration.PFUnit) enumeration of power factor unit (There are No Unit, L, C), refer to geny documentation
+        '''
+        self.energyErrorCalibration.setPowerFactorUnit(value)
+        
     def apply(self):
+        '''
+            Apply configuration on test bench
+        '''
         if self.mode == GenyTestBench.Mode.ENERGY_ERROR_CALIBRATION:
             buffer = self.energyErrorCalibration.setTestCommandForm(verbose=True)
             result = self.serialMonitor.transaction(buffer)
@@ -188,10 +212,12 @@ if __name__ == '__main__':
                 exit(1)
             
             input('Enter to continue')
-            # timeWait = 10
-            # for i in range(timeWait):
-            #     print(f'[apply_voltage] wait {timeWait-1-i}')
-            #     time.sleep(1)
+            timeWait = 10
+            for i in range(timeWait):
+                print(f'[apply_voltage] wait {timeWait-1-i}')
+                time.sleep(1)
+        print('[apply_voltage] closing port')
+        geny.close()
 
     def apply_current():
         print('[apply_voltage] opening port')
@@ -225,10 +251,12 @@ if __name__ == '__main__':
                 exit(1)
             
             input('Enter to continue')
-            # timeWait = 10
-            # for i in range(timeWait):
-            #     print(f'[apply_voltage] wait {timeWait-1-i}')
-            #     time.sleep(1)
+            timeWait = 10
+            for i in range(timeWait):
+                print(f'[apply_voltage] wait {timeWait-1-i}')
+                time.sleep(1)
+        print('[apply_voltage] closing port')
+        geny.close()
     
     def readback_sampling_data():
         print('[apply_voltage] opening port')
@@ -262,17 +290,49 @@ if __name__ == '__main__':
                 exit(1)
             geny.readBackSamplingData(verbose = True)
             input('Enter to continue')
+        print('[apply_voltage] closing port')
+        geny.close()
+    
+    def apply_power_factor():
+        print('[apply_voltage] opening port')
+        print(geny.open())
+        print('[apply_voltage] set power selector')
+        geny.setPowerSelector(PowerSelector._3P4W_ACTIVE)
+        
+        # channel selector
+        elementSelector = (
+            ElementSelector.EnergyErrorCalibration._A_ELEMENT,
+            ElementSelector.EnergyErrorCalibration._B_ELEMENT,
+            ElementSelector.EnergyErrorCalibration._C_ELEMENT,
+            ElementSelector.EnergyErrorCalibration._COMBINE_ALL
+        )
+        for element in elementSelector:
+            print(f'[apply_voltage] set channel selector: {element}')        
+            geny.setElementSelector(element)        
+            print('[apply_voltage] set voltage range')
+            geny.setVoltageRange(VoltageRange.YC99T_5C._220V)
+            print('[apply_voltage] set voltage')
+            geny.setVoltage(220)
+            print('[apply_voltage] set current')
+            geny.setCurrent(5)
+            print('[apply_voltage] set power factor')
+            geny.setPowerFactor(75, inDegree=True)
+            print('[apply_voltage] apply test bench configuration')
+            result = geny.apply()
+            print(f'[apply_voltage] result: {result}')
+            if result == False:
+                print('[apply_voltage] could not satisfied your command')
+                print('[apply_voltage] closing port')
+                geny.close()
+                exit(1)
+            geny.readBackSamplingData(verbose = True)
+            input('Enter to continue')
+        print('[apply_voltage] closing port')    
+        geny.close()
     
     # Test Case
-    # login_logout()
-    # apply_voltage()
-    # apply_current()
+    login_logout()
+    apply_voltage()
+    apply_current()
     readback_sampling_data()
-
-    timeWait = 10
-    for i in range(timeWait):
-        print(f'Wait {timeWait-1-i}')
-        time.sleep(1)
-
-    print('[apply_voltage] closing port')
-    print(geny.close())
+    apply_power_factor()

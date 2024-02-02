@@ -1,7 +1,6 @@
 from typing import Union, Tuple
 from Util import Util, ResponseDataFrame, CommmandDataFrame, VoltageRange, CurrentRange, PowerSelector, ElementSelector
 from Util import VoltageRangeError, CurrentRangeError, DatFrameError
-import math
 
 class Register:
     def __init__(self, name, dtype, size):
