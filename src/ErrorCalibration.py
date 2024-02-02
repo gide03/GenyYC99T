@@ -1,8 +1,80 @@
-from typing import Union
-from Util import Util, CommmandDataFrame, VoltageRange, CurrentRange, PowerSelector, ElementSelector
-from Util import VoltageRangeError, CurrentRangeError
+from typing import Union, Tuple
+from Util import Util, ResponseDataFrame, CommmandDataFrame, VoltageRange, CurrentRange, PowerSelector, ElementSelector
+from Util import VoltageRangeError, CurrentRangeError, DatFrameError
 import math
+
+class Register:
+    def __init__(self, name, dtype, size):
+        self.name = name
+        self.dtype = dtype
+        self.size = size
+        self.value = 0
+        
 class EnergyErrorCalibration:
+    class ReadbackSamplingDataRegister(Register):
+        def __init__(self):
+            self.Voltage_A = Register('Voltage_A', float, 4)
+            self.VoltagePhase_A = Register('VoltagePhase_A', float, 4)
+            self.Current_A = Register('Current_A', float, 4)
+            self.CurrentPhase_A = Register('CurrentPhase_A', float, 4)
+            self.PowerActive_A = Register('PowerActive_A', float, 4)
+            self.PowerReactive_A = Register('PowerReactive_A', float, 4)
+            self.Voltage_B = Register('Voltage_B', float, 4)
+            self.VoltagePhase_B = Register('VoltagePhase_B', float, 4)
+            self.Current_B = Register('Current_B', float, 4)
+            self.CurrentPhase_B = Register('CurrentPhase_B', float, 4)
+            self.PowerActive_B = Register('PowerActive_B', float, 4)
+            self.PowerReactive_B = Register('PowerReactive_B', float, 4)
+            self.Voltage_C = Register('Voltage_C', float, 4)
+            self.VoltagePhase_C = Register('VoltagePhase_C', float, 4)
+            self.Current_C = Register('Current_C', float, 4)
+            self.CurrentPhase_C = Register('CurrentPhase_C', float, 4)
+            self.PowerActive_C = Register('PowerActive_C', float, 4)
+            self.PowerReactive_C = Register('PowerReactive_C', float, 4)
+            self.TotalPowerActive = Register('TotalPowerActive', float, 4)
+            self.TotalPowerReactive = Register('TotalPowerReactive', float, 4)
+            
+            self.registerList = (
+                self.Voltage_A,
+                self.VoltagePhase_A,
+                self.Current_A,
+                self.CurrentPhase_A,
+                self.PowerActive_A,
+                self.PowerReactive_A,
+                self.Voltage_B,
+                self.VoltagePhase_B,
+                self.Current_B,
+                self.CurrentPhase_B,
+                self.PowerActive_B,
+                self.PowerReactive_B,
+                self.Voltage_C,
+                self.VoltagePhase_C,
+                self.Current_C,
+                self.CurrentPhase_C,
+                self.PowerActive_C,
+                self.PowerReactive_C,
+                self.TotalPowerActive,
+                self.TotalPowerReactive,
+            )
+
+        def getValue(self) -> Tuple[Register]:
+            return self.registerList
+        
+        def extractResponseDataFrame(self, dataFrame:ResponseDataFrame) -> Tuple[Register]:
+            if not isinstance(dataFrame, ResponseDataFrame):
+                raise TypeError(f'dataFrame expect ResponseDataFrame not {type(dataFrame)}')
+            
+            data = dataFrame.DATA
+            if len(data) == len(self.registerList*4):
+                pass
+            else:
+                raise DatFrameError(f'Dataframe length not comply {len(self.registerList)*4}')
+            
+            values = [data[i:i+4] for i in range(0, len(data), 4)]
+            for reg, val in zip(self.registerList, values):
+                reg.value = Util.Hex2float(val, size=reg.size)
+            return self.getValue()
+        
     class Buffer:
         def __init__(self):
             self.POWER_SELECTION = 0
@@ -42,6 +114,7 @@ class EnergyErrorCalibration:
         self.calibMeasurementCycle = 0
         
         self.commandDataFrame = CommmandDataFrame()
+        self.readbackSamplingRegister = EnergyErrorCalibration.ReadbackSamplingDataRegister()
     
     #
     # Internal Util
@@ -125,6 +198,22 @@ class EnergyErrorCalibration:
                 frequency (float) the signal frequency
         '''
         self.frequency = frequency
+        
+    # SET POWER FACTOR
+    def setPowerFactor(self, powerFactor:float):
+        '''
+            parameters:
+                powerFactor (float) the value of power factor
+        '''
+        self.powerFactor = powerFactor
+    
+    # SET POWER FACTOR UNIT
+    def setPowerFactorUnit(self, powerFactorUnit:PFUnit):
+        '''
+            paramters:
+                powerFactorUnit (PFUnit) power factor characteristic
+        '''
+        self.powerFactorUnit = powerFactorUnit        
     #
     
     # SEND DATA
@@ -188,18 +277,6 @@ class EnergyErrorCalibration:
         
         dataFrame = self.commandDataFrame.genDataFrame(EnergyErrorCalibration.Command.TEST_COMMAND, apdu)
         return dataFrame
-        
-        
-        # for i,reg in enumerate(self.bufferRegister):
-        #     if byte_form_size[i] == 2:
-        #         output.extend(Util.uint2byteList(self.bufferRegister[reg], bytesize=byte_form_size[i]))
-        #     elif byte_form_size[i] == 1:
-        #         output.append(self.bufferRegister[reg])
-        #     else:
-        #         temp = Util.float2byte(self.bufferRegister[reg], bytesize=byte_form_size[i])
-        #         output.extend(temp) 
-        # df = Util.genDataFrame(EnergyErrorCalibration.Command.TEST_COMMAND, output)
-        # return df[:]
     
     def stopCommand(self) -> list:
         '''
@@ -213,7 +290,7 @@ class EnergyErrorCalibration:
         '''
             return data frame in list to request test bench feedback
         '''
-        data = []
+        df = [] # for storing dataframe that will be send
         control_flag_bit = 0
 
         if count == 1:
@@ -221,61 +298,61 @@ class EnergyErrorCalibration:
         elif count == '*':
             control_flag_bit = 2
 
-        data.append(control_flag_bit)
-        data = Util.genDataFrame(EnergyErrorCalibration.Command.READBACK_SAMPLING_DATA, data)
-        return data
-    
-    def readbackSamplingTranslator(self,data:dict) -> dict:
-        '''
-            parameter data has structure as following
-            {   
-                "SOI": _soi,
-                "COMMAND" : 0xc1,
-                "ERROR_CODE": _err_code,
-                "DATA": [...],
-                "CRC": [LowByte_CRC, HighByte_CRC]
-            }
+        df.append(control_flag_bit)
+        df = self.commandDataFrame.genDataFrame(EnergyErrorCalibration.Command.READBACK_SAMPLING_DATA, df)
+        return df
+        
+    # def readbackSamplingTranslator(self,data:dict) -> dict:
+    #     '''
+    #         parameter data has structure as following
+    #         {   
+    #             "SOI": _soi,
+    #             "COMMAND" : 0xc1,
+    #             "ERROR_CODE": _err_code,
+    #             "DATA": [...],
+    #             "CRC": [LowByte_CRC, HighByte_CRC]
+    #         }
 
-            this function expects got data value from SerialHandler::transaction(), so you no need to worry about data structure
-        '''
-        registers = {
-            'Ua_amplitude'          : 0.0,
-            'Ua_phase'              : 0.0,
-            'Ia_amplitude'          : 0.0,
-            'Ia_phase'              : 0.0,
-            'Pa'                    : 0.0,
-            'Qa'                    : 0.0,
+    #         this function expects got data value from SerialHandler::transaction(), so you no need to worry about data structure
+    #     '''
+    #     registers = {
+    #         'Ua_amplitude'          : 0.0,
+    #         'Ua_phase'              : 0.0,
+    #         'Ia_amplitude'          : 0.0,
+    #         'Ia_phase'              : 0.0,
+    #         'Pa'                    : 0.0,
+    #         'Qa'                    : 0.0,
 
-            'Ub_amplitude'          : 0.0,
-            'Ub_phase'              : 0.0,
-            'Ib_amplitude'          : 0.0,
-            'Ib_phase'              : 0.0,
-            'Pb'                    : 0.0,
-            'Qb'                    : 0.0,
+    #         'Ub_amplitude'          : 0.0,
+    #         'Ub_phase'              : 0.0,
+    #         'Ib_amplitude'          : 0.0,
+    #         'Ib_phase'              : 0.0,
+    #         'Pb'                    : 0.0,
+    #         'Qb'                    : 0.0,
 
-            'Uc_amplitude'          : 0.0,
-            'Uc_phase'              : 0.0,
-            'Ic_amplitude'          : 0.0,
-            'Ic_phase'              : 0.0,
-            'Pc'                    : 0.0,
-            'Qc'                    : 0.0,
+    #         'Uc_amplitude'          : 0.0,
+    #         'Uc_phase'              : 0.0,
+    #         'Ic_amplitude'          : 0.0,
+    #         'Ic_phase'              : 0.0,
+    #         'Pc'                    : 0.0,
+    #         'Qc'                    : 0.0,
 
-            'P'                     : 0.0,
-            'Q'                     : 0.0
-        }
-        if data['ERROR_CODE'] == 0:
-            if len(data['DATA']) == 80:
-                for idx,i in enumerate(registers):
-                    temp = []
-                    for j in range(4):
-                        temp.append(data['DATA'].pop(0))
-                    registers[i] = Util.Hex2float(temp)
-                registers['Sa'] = math.hypot(registers['Pa'],registers['Qa'])
-                registers['Sb'] = math.hypot(registers['Pb'],registers['Qb'])
-                registers['Sc'] = math.hypot(registers['Pc'],registers['Qc'])
-                registers['S'] = math.hypot(registers['P'],registers['Q'])
-                return registers.copy()
-        return {}
+    #         'P'                     : 0.0,
+    #         'Q'                     : 0.0
+    #     }
+    #     if data['ERROR_CODE'] == 0:
+    #         if len(data['DATA']) == 80:
+    #             for idx,i in enumerate(registers):
+    #                 temp = []
+    #                 for j in range(4):
+    #                     temp.append(data['DATA'].pop(0))
+    #                 registers[i] = Util.Hex2float(temp)
+    #             registers['Sa'] = math.hypot(registers['Pa'],registers['Qa'])
+    #             registers['Sb'] = math.hypot(registers['Pb'],registers['Qb'])
+    #             registers['Sc'] = math.hypot(registers['Pc'],registers['Qc'])
+    #             registers['S'] = math.hypot(registers['P'],registers['Q'])
+    #             return registers.copy()
+    #     return {}
     
     def readbackErrorSampling(self, count:int=1) -> list:
         '''
