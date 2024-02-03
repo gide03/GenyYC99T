@@ -1,13 +1,51 @@
 import struct
-
+import ctypes
+from typing import Union, List
 class VoltageRangeError(Exception):
     pass
 
 class CurrentRangeError(Exception):
     pass
 
-class DatFrameError(Exception):
+class DataFrameError(Exception):
     pass
+
+class Register:
+    def __init__(self, name:str, dtype:ctypes, value=None, desc:str='') -> None:
+        '''
+            parameters:
+                - name `str` the register name
+                - dtype `ctypes` register data type
+        '''
+        self.name = name
+        self.dtype = dtype
+        self.bytesize = ctypes.sizeof(dtype)
+        self.desc = desc
+        self.value = value
+    
+    def setValueFromList(self, byteList:Union[bytearray, list]):
+        if len(byteList) != self.bytesize:
+            raise DataFrameError(f'Register {self.name} is {self.bytesize} Bytes but receive {len(byteList)} Bytes')
+
+        if self.dtype == ctypes.c_float:
+            self.value = Util.Hex2float(byteList, self.bytesize)
+        elif self.dtype in (ctypes.c_uint, ctypes.c_uint16, ctypes.c_uint32):
+            self.value = Util.Hex2uint(byteList, self.bytesize)
+        # TODO: Maybe need to support to another data types. But, refer to Geny protocol documentation, we don't need the other data types
+
+class Form:
+    def getRegisters(self) -> List[Register]:
+        registerList = vars(self)
+        return [registerList[registerName] for registerName in registerList]
+
+    def extractFromList(self, byteList:Union[bytearray, list]) -> dict:
+        formParameters = vars(self)
+        for registerName in formParameters:
+            register = formParameters[registerName]
+            byteSize = register.bytesize
+            dataBytes = [byteList.pop(0) for i in range(byteSize)]
+            register.setValueFromList(dataBytes)        
+        return formParameters        
 
 class CommmandDataFrame:
     SOI_BIT_LENGTH = 1
